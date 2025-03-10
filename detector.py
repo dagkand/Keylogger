@@ -1,32 +1,37 @@
 import psutil
-import os
 
-SUSPICIOUS_KEYWORDS = ["keylogger", "pynput", "keyboard", "hook", "intercept"]
+# Suspicious keywords
+SUSPICIOUS_KEYWORDS = ["keylogger", "pynput", "keyboard", "hook", "intercept", "capture", "record", "python"]
 
-def check_suspicious_processes():
-    suspicious_processes = []
-    
-    for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
+# Known safe processes
+SAFE_PROCESSES = ["opera.exe", "chrome.exe", "firefox.exe", "msedge.exe"]
+
+# Function to scan for keyloggers
+def scan_for_keyloggers():
+    """Scans for keylogger processes."""
+    detected_processes = []
+
+    # Check for suspicious processes
+    for process in psutil.process_iter(attrs=['pid', 'name', 'cmdline']):
         try:
-            process_name = proc.info['name'] or ""
-            process_cmd = " ".join(proc.info['cmdline']) if proc.info['cmdline'] else ""
+            process_name = process.info['name'].lower() if process.info['name'] else ""
+            cmd_line = " ".join(process.info['cmdline']).lower() if process.info['cmdline'] else ""
 
-            if any(keyword in process_name.lower() or keyword in process_cmd.lower() for keyword in SUSPICIOUS_KEYWORDS):
-                suspicious_processes.append((proc.info['pid'], process_name, process_cmd))
-        
+            # Skip known safe processes
+            if process_name in SAFE_PROCESSES:
+                continue
+
+            # Check for Python processes
+            if "python" in process_name:
+                if any(keyword in cmd_line for keyword in SUSPICIOUS_KEYWORDS):
+                    detected_processes.append(f"⚠️ PID: {process.info['pid']} | Name: {process_name} | CMD: {cmd_line}")
+            # Check for other suspicious processes
+            elif any(keyword in process_name or keyword in cmd_line for keyword in SUSPICIOUS_KEYWORDS):
+                detected_processes.append(f"⚠️ PID: {process.info['pid']} | Name: {process_name} | CMD: {cmd_line}")
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            continue
-    
-    return suspicious_processes
+            continue  # Ignore inaccessible processes
 
-if __name__ == "__main__":
-    print("Scanning for keyloggers..")
-    found = check_suspicious_processes()
-
-    if found:
-        print("WARNING: Potential keyloggers detected!")
-        for pid, name, cmd in found:
-            print(f"PID: {pid} | Process: {name} | Command: {cmd}")
-        print("Consider terminating these processes if they are unknown.")
+    if detected_processes:
+        return "\n".join(detected_processes)
     else:
-        print("No keyloggers found!")
+        return "✅ No keyloggers detected."

